@@ -1,56 +1,46 @@
-/* Basic, professional styling without relying on external frameworks */
+/* Basic, clean styling without relying on external CSS frameworks. */
 :root {
   --bg: #0f172a;
   --panel: #111827;
   --text: #e5e7eb;
   --muted: #9ca3af;
-  --accent: #06b6d4;
+  --accent: #22c55e;
 }
 
 * { box-sizing: border-box; }
-
-html, body {
+html, body { height: 100%; }
+body {
   margin: 0;
-  padding: 0;
-  background: var(--bg);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, "Apple Color Emoji", "Segoe UI Emoji";
+  background: radial-gradient(1200px 800px at 10% 10%, #111827 0%, var(--bg) 40%, #0b1022 100%);
   color: var(--text);
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
 .container {
-  max-width: 840px;
-  margin: 0 auto;
-  padding: 24px;
+  max-width: 720px;
+  margin: 4rem auto;
+  padding: 0 1rem;
 }
 
-header h1 {
-  margin: 0 0 4px 0;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-}
-
-.subtitle {
-  margin: 0;
-  color: var(--muted);
-}
+.page-header { margin-bottom: 1rem; }
+.page-header h1 { margin: 0 0 .25rem; font-size: 2rem; }
+.subtitle { margin: 0; color: var(--muted); }
 
 .card {
-  background: var(--panel);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.25);
 }
+.card-body { padding: 1.25rem; }
+.lead { margin: 0 0 .5rem; color: var(--muted); }
 
-.card-body { padding: 20px; }
-
-.card-title {
-  margin: 0 0 8px 0;
-  font-size: 20px;
+.total-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 2.75rem;
+  line-height: 1.1;
   color: var(--accent);
 }
 
-#total-sales {
-  font-size: 40px;
-  font-weight: 800;
-  letter-spacing: 0.4px;
-}
+.footer { margin-top: 1rem; color: var(--muted); }
