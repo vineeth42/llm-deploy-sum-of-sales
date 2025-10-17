@@ -1,62 +1,56 @@
-/* Basic, clean styles for a minimal single-page app */
+/* Basic, professional styling without relying on external frameworks */
 :root {
-  --bg: #0f172a;         /* slate-900 */
-  --panel: #111827;      /* gray-900 */
-  --text: #e5e7eb;       /* gray-200 */
-  --muted: #9ca3af;      /* gray-400 */
-  --accent: #22c55e;     /* green-500 */
-  --border: #1f2937;     /* gray-800 */
+  --bg: #0f172a;
+  --panel: #111827;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --accent: #06b6d4;
 }
 
 * { box-sizing: border-box; }
-html, body { height: 100%; }
-body {
+
+html, body {
   margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-  background: linear-gradient(180deg, var(--bg), #0b1227 60%);
+  padding: 0;
+  background: var(--bg);
   color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
 .container {
-  max-width: 760px;
-  margin: 3rem auto;
-  padding: 0 1rem;
+  max-width: 840px;
+  margin: 0 auto;
+  padding: 24px;
 }
 
-.page-header { margin-bottom: 1.5rem; }
-.page-header h1 {
-  margin: 0 0 .25rem 0;
+header h1 {
+  margin: 0 0 4px 0;
   font-weight: 700;
-  letter-spacing: .3px;
+  letter-spacing: 0.3px;
 }
-.subtle { color: var(--muted); margin: 0; }
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+}
 
 .card {
   background: var(--panel);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255,255,255,0.06);
   border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.25);
 }
-.card-body { padding: 1.25rem 1.25rem 1.5rem; }
-.card-title { margin: 0 0 .75rem 0; font-size: 1.15rem; color: var(--muted); font-weight: 600; }
 
-.total {
-  font-size: clamp(2rem, 5vw, 3.25rem);
-  font-weight: 800;
-  letter-spacing: .5px;
+.card-body { padding: 20px; }
+
+.card-title {
+  margin: 0 0 8px 0;
+  font-size: 20px;
   color: var(--accent);
 }
 
-.footer { margin-top: 2rem; color: var(--muted); text-align: center; }
-
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f8fafc;
-    --panel: #ffffff;
-    --text: #0f172a;
-    --muted: #475569;
-    --accent: #16a34a;
-    --border: #e5e7eb;
-  }
+#total-sales {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
 }
