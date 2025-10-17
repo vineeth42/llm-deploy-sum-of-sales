@@ -1,136 +1,145 @@
-'use strict';
+"use strict";
 
-// Utility: Set the document title to match evaluation requirement
-function setDynamicTitle() {
-  // The evaluation provides a global `seed`. Use it if available.
-  const s = (typeof window !== 'undefined' && typeof window.seed !== 'undefined') ? window.seed : '';
-  const title = `Sales Summary ${s}`;
-  document.title = title;
-
-  // Mirror in on-page heading for user clarity (not required by tests)
-  const heading = document.getElementById('page-heading');
-  if (heading) heading.textContent = title;
+// Utility: try to obtain the seed from common places (query param, globals, meta)
+function getSeed() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get("seed");
+    if (fromQuery !== null && fromQuery !== "") return fromQuery;
+  } catch (_) {}
+  if (typeof window !== "undefined") {
+    if (window.seed != null) return String(window.seed);
+    if (window.SEED != null) return String(window.SEED);
+  }
+  const meta = document.querySelector('meta[name="seed"]');
+  if (meta && meta.content) return meta.content;
+  // Fallback
+  return "0";
 }
 
-// Robust CSV parser supporting quotes and escaped quotes
+// Minimal robust CSV parser (handles commas inside quotes, RFC4180-ish)
 function parseCSV(text) {
   const rows = [];
   let row = [];
-  let field = '';
+  let cur = "";
   let inQuotes = false;
+  let i = 0;
 
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
+  // Normalize line endings
+  const s = text.replace(/\r\n?/g, "\n");
 
+  while (i < s.length) {
+    const ch = s[i];
     if (inQuotes) {
-      if (c === '"') {
-        if (text[i + 1] === '"') { // Escaped quote
-          field += '"';
-          i++;
+      if (ch === '"') {
+        if (s[i + 1] === '"') { // escaped quote
+          cur += '"';
+          i += 2;
+          continue;
         } else {
           inQuotes = false;
+          i++;
+          continue;
         }
       } else {
-        field += c;
+        cur += ch;
+        i++;
+        continue;
       }
     } else {
-      if (c === '"') {
+      if (ch === '"') {
         inQuotes = true;
-      } else if (c === ',') {
-        row.push(field);
-        field = '';
-      } else if (c === '\n') {
-        row.push(field);
+        i++;
+        continue;
+      }
+      if (ch === ',') {
+        row.push(cur);
+        cur = "";
+        i++;
+        continue;
+      }
+      if (ch === '\n') {
+        row.push(cur);
         rows.push(row);
         row = [];
-        field = '';
-      } else if (c === '\r') {
-        // Ignore CR; handle on LF
-      } else {
-        field += c;
+        cur = "";
+        i++;
+        continue;
       }
+      cur += ch;
+      i++;
     }
   }
-  // Push last field/row if file doesn't end with newline
-  if (field.length > 0 || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
+  // flush last field
+  row.push(cur);
+  rows.push(row);
 
-  // Trim BOM in first cell if present
-  if (rows.length && rows[0].length && rows[0][0]) {
-    rows[0][0] = rows[0][0].replace(/^\uFEFF/, '');
+  // drop possible trailing empty line
+  if (rows.length && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === "") {
+    rows.pop();
   }
-
-  // Remove any completely empty trailing rows
-  return rows.filter(r => r.some(cell => String(cell).trim() !== ''));
+  return rows;
 }
 
-// Parse numeric strings that may contain currency symbols, commas, or parentheses for negatives
-function parseSalesNumber(value) {
-  if (value == null) return 0;
-  let s = String(value).trim();
-  if (!s) return 0;
-
-  let negative = false;
-  if (s.startsWith('(') && s.endsWith(')')) {
-    negative = true;
-    s = s.slice(1, -1);
+// Convert a cell string to a number. Strips currency symbols and thousands.
+function toNumber(value) {
+  if (value == null) return NaN;
+  const s = String(value).trim();
+  if (!s) return NaN;
+  // Remove all except digits, minus, and dot
+  const cleaned = s.replace(/[^0-9.\-]/g, "");
+  // If multiple dots exist, keep the last as decimal separator
+  const parts = cleaned.split(".");
+  let normalized = cleaned;
+  if (parts.length > 2) {
+    const dec = parts.pop();
+    normalized = parts.join("") + "." + dec; // remove thousands-like dots
   }
-
-  // Remove common thousand separators and spaces
-  s = s.replace(/\s+/g, '').replace(/,/g, '');
-  // Strip out currency symbols and any non-numeric except sign, dot, exponent
-  s = s.replace(/[^0-9+\-.eE]/g, '');
-
-  let n = parseFloat(s);
-  if (!isFinite(n)) n = 0;
-  return negative ? -n : n;
-}
-
-async function fetchCSV(path) {
-  const resp = await fetch(path, { cache: 'no-store' });
-  if (!resp.ok) throw new Error(`Failed to fetch ${path}: ${resp.status} ${resp.statusText}`);
-  return resp.text();
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : NaN;
 }
 
 async function main() {
-  setDynamicTitle();
+  const seed = getSeed();
+  document.title = `Sales Summary ${seed}`;
+  const heading = document.getElementById("page-heading");
+  if (heading) heading.textContent = document.title;
 
-  const totalEl = document.getElementById('total-sales');
-  const messagesEl = document.getElementById('messages');
+  const statusEl = document.getElementById("status");
+  const totalEl = document.getElementById("total-sales");
 
   try {
-    const csvText = await fetchCSV('data.csv'); // Attachment provided by the environment
-    const rows = parseCSV(csvText);
-    if (!rows.length) throw new Error('CSV appears to be empty.');
+    const res = await fetch("data.csv", { cache: "no-store" });
+    if (!res.ok) throw new Error(`Failed to fetch data.csv (status ${res.status})`);
+    const text = await res.text();
 
-    const header = rows[0].map(h => String(h || '').trim());
-    const salesIdx = header.findIndex(h => h.toLowerCase() === 'sales');
-    if (salesIdx === -1) throw new Error("Couldn't find a 'sales' column in the CSV header.");
+    // Remove BOM if present
+    const csvText = text.replace(/^\uFEFF/, "");
+    const rows = parseCSV(csvText).filter(r => r && r.some(c => String(c).trim() !== ""));
+    if (rows.length === 0) throw new Error("CSV appears empty.");
+
+    const header = rows[0].map(h => String(h).trim());
+    const salesIdx = header.findIndex(h => h.toLowerCase() === "sales");
+    if (salesIdx === -1) throw new Error("Could not find 'sales' column in header.");
 
     let total = 0;
     for (let r = 1; r < rows.length; r++) {
-      const row = rows[r];
-      // Skip completely empty rows
-      if (!row || !row.some(cell => String(cell).trim() !== '')) continue;
-      const v = row[salesIdx];
-      total += parseSalesNumber(v);
+      const cell = rows[r][salesIdx];
+      const n = toNumber(cell);
+      if (Number.isFinite(n)) total += n;
     }
 
-    // Display with two decimals to keep it machine-parseable
+    // Display with two decimals
     totalEl.textContent = total.toFixed(2);
-
-    // Optional message for humans
-    messagesEl.textContent = 'Calculated from data.csv';
+    if (statusEl) statusEl.textContent = "Loaded.";
   } catch (err) {
-    console.error(err);
-    totalEl.textContent = '0.00';
-    const p = document.createElement('p');
-    p.className = 'error';
-    p.textContent = `Error: ${err.message}`;
-    messagesEl.appendChild(p);
+    if (statusEl) statusEl.textContent = `Error: ${err.message || err}`;
+    // Keep total element visible even on error
   }
 }
 
-window.addEventListener('DOMContentLoaded', main);
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", main);
+} else {
+  main();
+}
