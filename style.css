@@ -1,28 +1,64 @@
-/* Basic, clean styles; Bootstrap provides most layout */
+/* Basic, clean styling. The app does not rely on Bootstrap. */
 :root {
-  --accent: #0d6efd; /* Bootstrap primary */
+  --bg: #0f172a;      /* slate-900 */
+  --panel: #111827;   /* gray-900 */
+  --text: #e5e7eb;    /* gray-200 */
+  --muted: #94a3b8;   /* slate-400 */
+  --accent: #22c55e;  /* green-500 */
+}
+
+html, body {
+  height: 100%;
 }
 
 body {
-  min-height: 100vh;
+  margin: 0;
+  background: linear-gradient(180deg, var(--bg), #0b1220 60%);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
-#page-title {
-  letter-spacing: 0.2px;
+.container {
+  max-width: 720px;
+  margin: 6rem auto;
+  padding: 0 1rem;
 }
 
-#total-sales {
-  color: #111;
-}
-
-#status {
-  min-height: 1.25rem; /* Reserve space for messages */
+header h1 {
+  margin: 0 0 1rem;
+  font-size: 1.875rem;
+  letter-spacing: 0.3px;
 }
 
 .card {
-  border: 1px solid rgba(0,0,0,0.06);
+  background: var(--panel);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
 }
 
-.badge#row-count {
-  min-width: 2.25rem;
+.card-body {
+  padding: 1.25rem 1.25rem 1.5rem;
+}
+
+.lead {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+}
+
+#total-sales {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--accent);
+  word-break: break-word;
+}
+
+.messages {
+  margin-top: 1rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.messages .error {
+  color: #fca5a5; /* red-300 */
 }
