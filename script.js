@@ -1,150 +1,151 @@
-'use strict';
+/*
+  Sales Summary App
+  - Sets document.title to "Sales Summary ${seed}" when window.seed is available.
+  - Fetches data.csv from the same directory (attachments) and sums its `sales` column.
+  - Displays total in the #total-sales element.
+*/
 
-// Resolve the provided seed from different possible sources, then set the title.
-function resolveSeed() {
-  try {
-    if (typeof window.seed !== 'undefined' && window.seed !== null) return window.seed;
-  } catch (_) {}
-  const sp = new URLSearchParams(window.location.search);
-  if (sp.has('seed')) return sp.get('seed');
-  // Optionally look for a data attribute if used by harnesses
-  const el = document.documentElement;
-  if (el && el.dataset && el.dataset.seed) return el.dataset.seed;
-  return null;
-}
+(function () {
+  "use strict";
 
-function ensureTitle() {
-  const s = resolveSeed();
-  if (s !== null && s !== undefined) {
-    const finalTitle = `Sales Summary ${s}`;
-    if (document.title !== finalTitle) document.title = finalTitle;
-    const h1 = document.getElementById('page-title');
-    if (h1) h1.textContent = finalTitle;
-    return true;
-  }
-  return false;
-}
+  // DOM references
+  const titleEl = document.getElementById("page-title");
+  const statusEl = document.getElementById("status");
+  const totalEl = document.getElementById("total-sales");
+  const rowCountEl = document.getElementById("row-count");
 
-// Try to set the title ASAP, and keep trying briefly in case the environment sets seed later.
-(function initTitleWatcher() {
-  if (ensureTitle()) return;
-  let tries = 0;
-  const id = setInterval(() => {
-    tries++;
-    if (ensureTitle() || tries > 60) {
-      clearInterval(id);
-    }
-  }, 50);
-})();
-
-// Fetch the CSV text, trying a few common attachment locations.
-async function fetchCSVText() {
-  const candidates = [
-    'data.csv',
-    './data.csv',
-    '/data.csv',
-    'attachments/data.csv',
-    './attachments/data.csv',
-    '/attachments/data.csv'
-  ];
-
-  for (const url of candidates) {
-    try {
-      const res = await fetch(url, { cache: 'no-store' });
-      if (res.ok) return await res.text();
-    } catch (_) { /* try next */ }
-  }
-  throw new Error('Unable to locate data.csv');
-}
-
-// Split a CSV row on commas not within quotes.
-function splitCSVRow(row) {
-  // Handles commas inside double quotes
-  const parts = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < row.length; i++) {
-    const ch = row[i];
-    if (ch === '"') {
-      // Toggle inQuotes, but handle escaped quotes "" inside quoted fields
-      if (inQuotes && row[i + 1] === '"') {
-        current += '"';
-        i++; // skip next quote
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (ch === ',' && !inQuotes) {
-      parts.push(current);
-      current = '';
+  // Update page title based on window.seed if present
+  function setTitleFromSeed() {
+    const hasSeed = typeof window !== "undefined" && Object.prototype.hasOwnProperty.call(window, "seed");
+    if (hasSeed) {
+      const t = `Sales Summary ${window.seed}`;
+      document.title = t;
+      if (titleEl) titleEl.textContent = t;
     } else {
-      current += ch;
+      // Fallback if seed is not provided
+      const t = "Sales Summary";
+      document.title = t;
+      if (titleEl) titleEl.textContent = t;
     }
   }
-  parts.push(current);
-  return parts.map(s => s.trim());
-}
 
-// Parse CSV and sum the sales column (case-insensitive).
-function sumSalesFromCSV(text) {
-  const lines = text.replace(/\uFEFF/g, '').split(/\r?\n/).filter(l => l.trim().length > 0);
-  if (lines.length === 0) return 0;
+  // Lightweight CSV parser that supports quoted fields and escaped quotes
+  function parseCSV(text) {
+    const rows = [];
+    let cur = [];
+    let field = "";
+    let inQuotes = false;
 
-  const header = splitCSVRow(lines[0]).map(h => h.replace(/^\"|\"$/g, '').trim());
-  let salesIdx = header.findIndex(h => h.toLowerCase() === 'sales');
-  if (salesIdx === -1) {
-    // Try to find a column that contains 'sales' (e.g., 'total_sales')
-    salesIdx = header.findIndex(h => h.toLowerCase().includes('sales'));
+    // Normalize line endings and strip BOM if present
+    text = text.replace(/^\uFEFF/, "");
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const next = text[i + 1];
+
+      if (inQuotes) {
+        if (char === '"') {
+          if (next === '"') {
+            field += '"';
+            i++; // skip escaped quote
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          field += char;
+        }
+      } else {
+        if (char === ',') {
+          cur.push(field);
+          field = "";
+        } else if (char === '\n') {
+          cur.push(field);
+          rows.push(cur);
+          cur = [];
+          field = "";
+        } else if (char === '\r') {
+          // Ignore \r (CR); handle possible \r\n by letting \n branch handle row end
+        } else if (char === '"') {
+          inQuotes = true;
+        } else {
+          field += char;
+        }
+      }
+    }
+
+    // push last field/row
+    if (field.length > 0 || inQuotes || cur.length > 0) {
+      cur.push(field);
+      rows.push(cur);
+    }
+
+    // Remove trailing empty rows
+    while (rows.length && rows[rows.length - 1].every(v => v === "")) rows.pop();
+
+    return rows;
   }
-  if (salesIdx === -1) throw new Error('No sales column found');
 
-  let total = 0;
-  for (let i = 1; i < lines.length; i++) {
-    const row = splitCSVRow(lines[i]).map(c => c.replace(/^\"|\"$/g, ''));
-    if (row.length <= salesIdx) continue;
-    const raw = (row[salesIdx] || '').trim();
-    if (!raw) continue;
-
-    // Remove currency symbols and thousand separators, keep sign and decimal point
-    const normalized = raw
-      .replace(/[\$£€¥₹]/g, '') // currency symbols
-      .replace(/\s/g, '')
-      .replace(/,(?=\d{3}(\D|$))/g, ''); // drop thousands commas
-
-    const val = parseFloat(normalized);
-    if (!Number.isNaN(val)) total += val;
+  function toNumber(val) {
+    if (val == null) return NaN;
+    const cleaned = String(val).trim().replace(/,/g, "");
+    const n = parseFloat(cleaned);
+    return Number.isFinite(n) ? n : NaN;
   }
-  return total;
-}
 
-function setTotal(value) {
-  const el = document.getElementById('total-sales');
-  if (!el) return;
-  // Show with two decimals, adequate for currency and tolerant check
-  const text = Number.isFinite(value) ? value.toFixed(2) : '0.00';
-  const changed = el.textContent !== text;
-  el.textContent = text;
-  if (changed) {
-    el.classList.remove('updated');
-    // Trigger animation style when value updates
-    requestAnimationFrame(() => {
-      el.classList.add('updated');
-    });
+  async function loadAndSum() {
+    try {
+      statusEl.textContent = "Loading data.csv…";
+      const resp = await fetch("data.csv", { cache: "no-store" });
+      if (!resp.ok) throw new Error(`Failed to fetch data.csv (status ${resp.status})`);
+      const text = await resp.text();
+
+      const rows = parseCSV(text);
+      if (!rows.length) throw new Error("CSV appears empty");
+
+      // Identify header and sales column
+      const header = rows[0].map(h => String(h || "").trim());
+      let salesIdx = header.findIndex(h => h.toLowerCase() === "sales");
+
+      // If header isn't labeled, but there's only one column, assume it's sales
+      let dataStart = 1;
+      if (salesIdx === -1) {
+        if (header.length === 1 && header[0] !== "") {
+          salesIdx = 0;
+          dataStart = 1; // treat first row as header anyway
+        } else {
+          // If first row isn't a header, try treating all rows as data and use col 0
+          salesIdx = 0;
+          dataStart = 0;
+        }
+      }
+
+      let total = 0;
+      let count = 0;
+      for (let r = dataStart; r < rows.length; r++) {
+        const row = rows[r];
+        if (!row || row.length <= salesIdx) continue;
+        const n = toNumber(row[salesIdx]);
+        if (Number.isFinite(n)) {
+          total += n;
+          count++;
+        }
+      }
+
+      // Update UI
+      totalEl.textContent = total.toFixed(2);
+      if (rowCountEl) rowCountEl.textContent = count ? `${count} rows` : "0 rows";
+      statusEl.textContent = "";
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = `Error: ${err.message}`;
+      // Leave total as-is to avoid misleading results
+    }
   }
-}
 
-async function main() {
-  try {
-    const csv = await fetchCSVText();
-    const total = sumSalesFromCSV(csv);
-    setTotal(total);
-  } catch (err) {
-    console.error(err);
-    setTotal(0);
-  }
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', main);
-} else {
-  main();
-}
+  // Initialize
+  setTitleFromSeed();
+  // Re-apply title shortly after load in case seed becomes available late
+  // (harmless if already set correctly)
+  window.addEventListener("load", setTitleFromSeed);
+  loadAndSum();
+})();
